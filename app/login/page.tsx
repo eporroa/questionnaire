@@ -3,13 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { IUser } from "@/supabase/typings";
 
-type UserResponse = {
-  username: string;
-  password: string;
+interface UserResponse extends Omit<IUser, "role"> {
   role: "user" | "admin";
   error: string;
-};
+}
 
 export default function LoginPage() {
   const [error, setError] = useState("");
@@ -43,7 +42,7 @@ export default function LoginPage() {
         return;
       }
 
-      setUser({ username: data.username, role: data.role });
+      setUser({ id: data.id, username: data.username, role: data.role });
       router.push(data.role === "admin" ? "/admin" : "/questionnaires");
     } catch (e: unknown) {
       console.log(e);

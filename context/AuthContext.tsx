@@ -4,6 +4,7 @@ import { createContext, useContext, ReactNode } from "react";
 import { signal } from "@preact/signals-react";
 
 interface User {
+  id: string;
   username: string;
   role: "user" | "admin";
 }

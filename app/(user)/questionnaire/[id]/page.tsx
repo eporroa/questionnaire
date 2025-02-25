@@ -4,11 +4,12 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
 
 type Question = {
   id: number;
   question: string;
-  type: "mcq" | "text";
+  type: "mcq" | "input";
   options?: string[];
 };
 
@@ -21,12 +22,14 @@ type Params = {
 };
 
 interface QuestionnairePageProps {
-  params: { id: Promise<{ id: string }> };
+  params: Promise<Params>;
 }
 
 export default function QuestionnairePage({ params }: QuestionnairePageProps) {
-  const [questions, setQuestions] = useState([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState({});
+
+  const { user } = useAuth();
   const router = useRouter();
   const { id } = use(params);
 
@@ -35,14 +38,18 @@ export default function QuestionnairePage({ params }: QuestionnairePageProps) {
       const { data } = await supabase
         .from("questionnaire_junction")
         .select("question_id, priority, questionnaire_questions(id, question)")
-        .eq("questionnaire_id", id)
+        .eq("questionnaire_id", Number(id))
         .order("priority", { ascending: true });
 
       setQuestions(
-        data.map((q) => ({
-          id: q.question_id,
-          ...JSON.parse(q.questionnaire_questions.question),
-        }))
+        data
+          ? data.map((q) => {
+            const question = {...(q.questionnaire_questions?.question ?? {})};
+            return ({
+              id: q.question_id,
+              ...question
+            })})
+          : []
       );
     }
     fetchQuestions();
@@ -51,11 +58,10 @@ export default function QuestionnairePage({ params }: QuestionnairePageProps) {
   const handleSubmit = async () => {
     for (const [id, answer] of Object.entries(answers)) {
       await supabase.from("user_answers").upsert({
-        user_id: "user1", // Placeholder
-        questionnaire_id: params.id,
+        user_id: user.value?.id,
         question_id: id,
-        answer: JSON.stringify(answer),
-      });
+        answer,
+      }: IUserAnswers);
     }
     router.push("/questionnaires");
   };
@@ -66,7 +72,7 @@ export default function QuestionnairePage({ params }: QuestionnairePageProps) {
         <div key={q.id} className="mb-4">
           <p className="font-semibold">{q.question}</p>
           {q.type === "mcq" ? (
-            q.options.map((opt) => (
+            (q.options ?? []).map((opt) => (
               <label key={opt} className="block">
                 <input
                   type="checkbox"

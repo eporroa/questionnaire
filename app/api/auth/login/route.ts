@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json(
-    { username: user.username, role: user.role },
+    { id: user.id, username: user.username, role: user.role },
     { status: 200 }
   );
 }
