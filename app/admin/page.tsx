@@ -4,8 +4,21 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { Question } from "../(user)/questionnaire/[id]/page";
 
+interface UserParsedAnswers {
+  questionnaire_id: string;
+  question_id: string;
+  answer: Record<string | number, string | string[]>;
+  questionnaire_questionnaires: {
+    name: string;
+  };
+  questionnaire_questions: {
+    question: string;
+  };
+}
 interface UserData {
+  id: string;
   username: string;
   completed_questionnaires: number;
 }
@@ -15,7 +28,7 @@ export default function AdminPage() {
   const router = useRouter();
   const [users, setUsers] = useState<UserData[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [userResponses, setUserResponses] = useState<any[]>([]);
+  const [userAnswers, setUserAnswers] = useState<UserParsedAnswers[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -29,10 +42,7 @@ export default function AdminPage() {
   async function fetchUsers() {
     const { data, error } = await supabase
       .from("user_answers")
-      .select(
-        "user_id, COUNT(DISTINCT questionnaire_id) as completed_questionnaires"
-      )
-      .groupBy("user_id");
+      .select("user_id, completed_questionnaires:questionnaire_id.count()");
 
     if (error) {
       console.error("Error fetching users:", error.message);
@@ -44,11 +54,12 @@ export default function AdminPage() {
     const { data: userData } = await supabase
       .from("users")
       .select("id, username")
-      .in("id", userIds);
+      .in("id", userIds as string[]);
 
     if (!userData) return;
 
     const formattedUsers = data.map((u) => ({
+      id: u.user_id as string,
       username:
         userData.find((usr) => usr.id === u.user_id)?.username || "Unknown",
       completed_questionnaires: u.completed_questionnaires,
@@ -57,25 +68,28 @@ export default function AdminPage() {
     setUsers(formattedUsers);
   }
 
-  async function fetchUserResponses(username: string) {
+  async function fetchUserResponses(id: string) {
     setLoading(true);
-    setSelectedUser(username);
 
-    const { data, error } = await supabase
-      .from("user_answers")
-      .select(
-        "questionnaire_id, question_id, answer, questionnaire_questionnaires(name), questionnaire_questions(question)"
-      )
-      .eq("user_id", users.find((u) => u.username === username)?.username); // Replace with user ID mapping
+    try {
+      const { data, error } = await supabase
+        .from("user_answers")
+        .select(
+          "questionnaire_id, question_id, answer, questionnaire_questionnaires(name), questionnaire_questions(question)"
+        )
+        .eq("user_id", users.find((u) => u.id === id)?.id as string);
 
-    if (error) {
-      console.error("Error fetching user responses:", error.message);
+      if (error) {
+        console.error("Error fetching user responses:", error.message);
+        return;
+      }
+      setSelectedUser(users.find((u) => u.id === id)?.username ?? null);
+      setUserAnswers(data as unknown as UserParsedAnswers[]);
+    } catch (e) {
+      console.error(e);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setUserResponses(data || []);
-    setLoading(false);
   }
 
   return (
@@ -99,7 +113,7 @@ export default function AdminPage() {
               <td className="border p-2">
                 <button
                   className="bg-blue-500 text-white px-4 py-1"
-                  onClick={() => fetchUserResponses(user.username)}
+                  onClick={() => fetchUserResponses(user.id)}
                 >
                   View Responses
                 </button>
@@ -116,21 +130,27 @@ export default function AdminPage() {
           </h2>
           {loading ? (
             <p>Loading responses...</p>
-          ) : userResponses.length > 0 ? (
-            userResponses.map((response, index) => (
+          ) : userAnswers.length > 0 ? (
+            userAnswers.map((response, index) => (
               <div key={index} className="border p-2 my-2">
                 <p>
                   <strong>Questionnaire:</strong>{" "}
                   {response.questionnaire_questionnaires.name}
                 </p>
                 <p>
-                  <strong>Q:</strong> {JSON.parse(response.question).question}
+                  <strong>Q:</strong>{" "}
+                  {
+                    (
+                      response.questionnaire_questions
+                        .question as unknown as Question
+                    ).question
+                  }
                 </p>
                 <p>
                   <strong>A:</strong>{" "}
-                  {Array.isArray(response.answer)
-                    ? response.answer.join(", ")
-                    : response.answer}
+                  {Array.isArray(response.answer[response.question_id])
+                    ? (response.answer[response.question_id] as []).join(", ")
+                    : response.answer[response.question_id]}
                 </p>
               </div>
             ))
