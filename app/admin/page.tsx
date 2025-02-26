@@ -131,29 +131,58 @@ export default function AdminPage() {
           {loading ? (
             <p>Loading responses...</p>
           ) : userAnswers.length > 0 ? (
-            userAnswers.map((response, index) => (
-              <div key={index} className="border p-2 my-2">
-                <p>
-                  <strong>Questionnaire:</strong>{" "}
-                  {response.questionnaire_questionnaires.name}
-                </p>
-                <p>
-                  <strong>Q:</strong>{" "}
-                  {
-                    (
-                      response.questionnaire_questions
-                        .question as unknown as Question
-                    ).question
-                  }
-                </p>
-                <p>
-                  <strong>A:</strong>{" "}
-                  {Array.isArray(response.answer[response.question_id])
-                    ? (response.answer[response.question_id] as []).join(", ")
-                    : response.answer[response.question_id]}
-                </p>
-              </div>
-            ))
+            (() => {
+              // Group answers by questionnaire
+              const groupedAnswers = userAnswers.reduce((acc, response) => {
+                const questionnaireName =
+                  response.questionnaire_questionnaires?.name ||
+                  "Ungrouped Questions";
+
+                if (!acc[questionnaireName]) {
+                  acc[questionnaireName] = [];
+                }
+
+                acc[questionnaireName].push(response);
+                return acc;
+              }, {} as Record<string, typeof userAnswers>);
+
+              return Object.entries(groupedAnswers).map(
+                ([questionnaireName, responses]) => (
+                  <div key={questionnaireName} className="mb-6">
+                    <h3 className="text-lg font-medium border-b-2 border-gray-200 pb-2 mb-3">
+                      {questionnaireName}
+                    </h3>
+                    <div className="pl-4">
+                      {responses.map((response, index) => (
+                        <div
+                          key={index}
+                          className="border rounded p-3 my-2 bg-gray-50"
+                        >
+                          <p className="font-medium">
+                            {
+                              (
+                                response.questionnaire_questions
+                                  .question as unknown as Question
+                              ).question
+                            }
+                          </p>
+                          <p className="mt-1 text-gray-700">
+                            <span className="font-medium">Answer: </span>
+                            {Array.isArray(response.answer)
+                              ? response.answer.join(", ")
+                              : (response.answer as unknown as string) ||
+                                "No answer provided."}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Question ID: {response.question_id}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              );
+            })()
           ) : (
             <p>No responses found.</p>
           )}

@@ -30,5 +30,5 @@ export default async function QuestionnairePage({
     id: q.question_id,
   })) as Question[];
 
-  return <Questionnaire questions={questions} />;
+  return <Questionnaire id={Number(id)} questions={questions} />;
 }

@@ -14,6 +14,7 @@ type Answers = {
 };
 
 interface QuestionnaireProps {
+  id: number;
   questions: Question[];
 }
 
@@ -24,15 +25,24 @@ const Questionnaire: FC<QuestionnaireProps> = ({ questions }) => {
   const router = useRouter();
 
   const handleSubmit = async () => {
+    const userAnswers = [];
     for (const [id, answer] of Object.entries(answers)) {
-      const userAnswers = {
+      const newItem = {
         user_id: user.value?.id,
         question_id: id,
+        questionnaire_id: 1,
         answer: answer as Json,
       } as unknown as IUserAnswers;
-      await supabase.from("user_answers").upsert(userAnswers);
+      userAnswers.push(newItem);
     }
-    router.push("/questionnaires");
+
+    try {
+      await supabase.from("user_answers").upsert(userAnswers);
+      router.push("/questionnaires");
+    } catch (error) {
+      console.error("Error inserting user answers", error);
+      alert("Error inserting user answers");
+    }
   };
 
   return (
