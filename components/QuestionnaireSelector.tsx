@@ -16,7 +16,7 @@ const QuestionnaireSelector: FC<QuestionnaireSelectorProps> = ({
       {questionnaires.map((q) => (
         <Link
           key={q.id}
-          className="block p-3 mb-2 border"
+          className="block p-3 mb-2 border hover:bg-gray-100"
           href={`/questionnaire/${q.id}`}
         >
           {q.name}

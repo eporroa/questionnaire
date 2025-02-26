@@ -55,6 +55,7 @@ const Questionnaire: FC<QuestionnaireProps> = ({ questions }) => {
               <label key={option} className="block">
                 <input
                   type="checkbox"
+                  className="mr-2"
                   onChange={(e) => {
                     setAnswers((prev) => {
                       const currentAnswers = Array.isArray(prev[question.id])
@@ -93,7 +94,6 @@ const Questionnaire: FC<QuestionnaireProps> = ({ questions }) => {
       >
         Submit
       </button>
-      {JSON.stringify(answers)}
     </div>
   );
 };
