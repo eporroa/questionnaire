@@ -279,16 +279,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
   ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
   : never;
-
-export type QuestionnaireJunction =
-  Database["public"]["Tables"]["questionnaire_junction"]["Row"];
-
-export type QuestionnaireQuestionnaires =
-  Database["public"]["Tables"]["questionnaire_questionnaires"]["Row"];
-
-export type QuestionnaireQuestions =
-  Database["public"]["Tables"]["questionnaire_questions"]["Row"];
-
-export type UserAnswers = Database["public"]["Tables"]["user_answers"]["Row"];
-
-export type Users = Database["public"]["Tables"]["users"]["Row"];
