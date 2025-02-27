@@ -8,4 +8,4 @@
  - Frontend: Next.js, TypeScript, Preact signals (for state management/user auth)
  - Backend: Next.js and Supabase (PostgreSQL)
  - Deployment: Vercel
- - UI Libraries: Tailwind CSS, Headless UI, React Hook Form, Zustand
+ - Libraries: Tailwind CSS, Preact Signals
