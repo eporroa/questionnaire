@@ -5,7 +5,6 @@
 `npm run dev`
 
 ## Tech Stack
- - Frontend: Next.js, TypeScript, Preact signals (for state management/user auth)
+ - Frontend: Next.js, TypeScript, Preact signals (for state management/user auth) and Tailwind CSS
  - Backend: Next.js and Supabase (PostgreSQL)
  - Deployment: Vercel
- - Libraries: Tailwind CSS, Preact Signals
