@@ -1,6 +1,7 @@
 import { AuthProvider } from "@/context/AuthContext";
 
 import "./globals.css";
+import { ToastProvider } from "@/context/ToastContext";
 
 export default function RootLayout({
   children,
@@ -10,7 +11,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="app">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );

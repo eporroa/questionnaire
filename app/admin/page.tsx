@@ -4,19 +4,24 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Question } from "../(user)/questionnaire/[id]/page";
+import { IUserAnswers } from "@/supabase/typings";
 
-interface UserParsedAnswers {
-  questionnaire_id: string;
-  question_id: string;
-  answer: Record<string | number, string | string[]>;
+type QuestionType = {
+  type: "mcq" | "input";
+  options?: string[];
+  question: string;
+};
+
+interface UserResponse extends Omit<IUserAnswers, "answer"> {
+  answer: string | string[];
   questionnaire_questionnaires: {
     name: string;
-  };
+  } | null;
   questionnaire_questions: {
-    question: string;
+    question: QuestionType;
   };
 }
+
 interface UserData {
   id: string;
   username: string;
@@ -28,7 +33,7 @@ export default function AdminPage() {
   const router = useRouter();
   const [users, setUsers] = useState<UserData[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [userAnswers, setUserAnswers] = useState<UserParsedAnswers[]>([]);
+  const [userAnswers, setUserAnswers] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -40,32 +45,56 @@ export default function AdminPage() {
   }, [user, router]);
 
   async function fetchUsers() {
-    const { data, error } = await supabase
-      .from("user_answers")
-      .select("user_id, completed_questionnaires:questionnaire_id.count()");
+    try {
+      const { data: answerData, error: answerError } = await supabase
+        .from("user_answers")
+        .select("user_id, questionnaire_id");
 
-    if (error) {
-      console.error("Error fetching users:", error.message);
-      return;
+      if (answerError) {
+        console.error("Error fetching user answers:", answerError.message);
+        return;
+      }
+
+      const userQuestionnaireCounts = answerData.reduce((acc, item) => {
+        if (!item.user_id) return acc;
+
+        if (!acc[item.user_id]) {
+          acc[item.user_id] = new Set();
+        }
+
+        if (item.questionnaire_id) {
+          acc[item.user_id].add(item.questionnaire_id);
+        }
+
+        return acc;
+      }, {} as Record<string, Set<number>>);
+
+      const userIds = Object.keys(userQuestionnaireCounts);
+      if (userIds.length === 0) {
+        setUsers([]);
+        return;
+      }
+
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("id, username")
+        .in("id", userIds);
+
+      if (userError) {
+        console.error("Error fetching users:", userError.message);
+        return;
+      }
+
+      const formattedUsers = userData.map((u) => ({
+        id: u.id,
+        username: u.username,
+        completed_questionnaires: userQuestionnaireCounts[u.id]?.size || 0,
+      }));
+
+      setUsers(formattedUsers);
+    } catch (err) {
+      console.error("Unexpected error:", err);
     }
-
-    // Fetch usernames
-    const userIds = data.map((u) => u.user_id);
-    const { data: userData } = await supabase
-      .from("users")
-      .select("id, username")
-      .in("id", userIds as string[]);
-
-    if (!userData) return;
-
-    const formattedUsers = data.map((u) => ({
-      id: u.user_id as string,
-      username:
-        userData.find((usr) => usr.id === u.user_id)?.username || "Unknown",
-      completed_questionnaires: u.completed_questionnaires,
-    }));
-
-    setUsers(formattedUsers);
   }
 
   async function fetchUserResponses(id: string) {
@@ -77,14 +106,16 @@ export default function AdminPage() {
         .select(
           "questionnaire_id, question_id, answer, questionnaire_questionnaires(name), questionnaire_questions(question)"
         )
-        .eq("user_id", users.find((u) => u.id === id)?.id as string);
+        .eq("user_id", id);
 
       if (error) {
         console.error("Error fetching user responses:", error.message);
         return;
       }
-      setSelectedUser(users.find((u) => u.id === id)?.username ?? null);
-      setUserAnswers(data as unknown as UserParsedAnswers[]);
+
+      const username = users.find((u) => u.id === id)?.username || "";
+      setSelectedUser(username);
+      setUserAnswers(data as UserResponse[]);
     } catch (e) {
       console.error(e);
     } finally {
@@ -106,30 +137,51 @@ export default function AdminPage() {
           </tr>
         </thead>
         <tbody>
-          {users.map((user) => (
-            <tr key={user.username} className="border">
-              <td className="border p-2">{user.username}</td>
-              <td className="border p-2">{user.completed_questionnaires}</td>
-              <td className="border p-2">
-                <button
-                  className="bg-blue-500 text-white px-4 py-1"
-                  onClick={() => fetchUserResponses(user.id)}
-                >
-                  View Responses
-                </button>
+          {users.length > 0 ? (
+            users.map((user) => (
+              <tr key={user.id} className="border hover:bg-gray-50">
+                <td className="border p-2">{user.username}</td>
+                <td className="border p-2 text-center">
+                  {user.completed_questionnaires}
+                </td>
+                <td className="border p-2">
+                  <button
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded"
+                    onClick={() => fetchUserResponses(user.id)}
+                  >
+                    View Responses
+                  </button>
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={3} className="border p-4 text-center text-gray-500">
+                No users found with completed questionnaires
               </td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
 
       {selectedUser && (
         <div className="mt-6 p-4 border rounded-lg shadow-lg bg-white">
-          <h2 className="text-xl font-semibold">
-            Responses for {selectedUser}
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">
+              Responses for {selectedUser}
+            </h2>
+            <button
+              className="text-sm text-gray-600 hover:text-gray-900"
+              onClick={() => setSelectedUser(null)}
+            >
+              Close
+            </button>
+          </div>
+
           {loading ? (
-            <p>Loading responses...</p>
+            <div className="p-8 text-center">
+              <p>Loading responses...</p>
+            </div>
           ) : userAnswers.length > 0 ? (
             (() => {
               // Group answers by questionnaire
@@ -144,7 +196,7 @@ export default function AdminPage() {
 
                 acc[questionnaireName].push(response);
                 return acc;
-              }, {} as Record<string, typeof userAnswers>);
+              }, {} as Record<string, UserResponse[]>);
 
               return Object.entries(groupedAnswers).map(
                 ([questionnaireName, responses]) => (
@@ -153,38 +205,37 @@ export default function AdminPage() {
                       {questionnaireName}
                     </h3>
                     <div className="pl-4">
-                      {responses.map((response, index) => (
-                        <div
-                          key={index}
-                          className="border rounded p-3 my-2 bg-gray-50"
-                        >
-                          <p className="font-medium">
-                            {
-                              (
-                                response.questionnaire_questions
-                                  .question as unknown as Question
-                              ).question
-                            }
-                          </p>
-                          <p className="mt-1 text-gray-700">
-                            <span className="font-medium">Answer: </span>
-                            {Array.isArray(response.answer)
-                              ? response.answer.join(", ")
-                              : (response.answer as unknown as string) ||
-                                "No answer provided."}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Question ID: {response.question_id}
-                          </p>
-                        </div>
-                      ))}
+                      {responses.map((response, index) => {
+                        const question =
+                          response.questionnaire_questions.question;
+                        return (
+                          <div
+                            key={index}
+                            className="border rounded p-3 my-2 bg-gray-50"
+                          >
+                            <p className="font-medium">{question.question}</p>
+                            <p className="mt-1 text-gray-700">
+                              <span className="font-medium">Answer: </span>
+                              {Array.isArray(response.answer)
+                                ? response.answer.join(", ")
+                                : response.answer || "No answer provided."}
+                            </p>
+                            <div className="flex gap-4 text-xs text-gray-500 mt-2">
+                              <p>Question ID: {response.question_id}</p>
+                              <p>Question Type: {question.type}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )
               );
             })()
           ) : (
-            <p>No responses found.</p>
+            <p className="text-center p-4 text-gray-500">
+              No responses found for this user.
+            </p>
           )}
         </div>
       )}
